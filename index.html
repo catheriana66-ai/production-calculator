@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>生产配料计算器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Sans+Thai:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --gold: #c8a96e;
+    --gold-dark: #8b6914;
+    --gold-dim: rgba(200,169,110,0.12);
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #252525;
+    --border2: #2e2e2e;
+    --text: #ede9e1;
+    --text2: #a09890;
+    --text3: #555;
+    --red: #e05252;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', 'Noto Sans Thai', 'PingFang SC', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { cursor: pointer; border: none; background: none; color: inherit; font-family: inherit; }
+  input { font-family: inherit; }
+  input:focus { outline: none; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  /* ── VIEWS ── */
+  .view { display: none; min-height: 100vh; padding-bottom: 60px; animation: fadeUp 0.2s ease; }
+  .view.active { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── HEADER ── */
+  .top-bar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(12,12,12,0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-badge {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .top-bar h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+  .top-bar .sub { font-size: 11px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
+  .back-btn { color: var(--gold); margin-right: 2px; display: flex; align-items: center; padding: 4px; }
+
+  /* ── SECTION LABEL ── */
+  .sec-label {
+    font-size: 10px; letter-spacing: 2px; color: var(--text3);
+    text-transform: uppercase; padding: 20px 18px 10px;
+  }
+
+  /* ── RECIPE LIST ── */
+  .recipe-list { padding: 0 14px; display: flex; flex-direction: column; gap: 8px; }
+  .recipe-row { display: flex; gap: 8px; }
+  .recipe-card {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 13px 15px;
+    display: flex; justify-content: space-between; align-items: center;
+    text-align: left; transition: border-color 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .recipe-card:active { background: var(--surface2); }
+  .recipe-card .rname { font-size: 15px; font-weight: 500; color: var(--text); }
+  .recipe-card .rmeta { font-size: 11.5px; color: var(--text3); margin-top: 3px; }
+  .recipe-card .rarrow { color: var(--gold); opacity: 0.6; font-size: 20px; }
+  .edit-btn {
+    width: 46px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    color: var(--text3); flex-shrink: 0; transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .edit-btn:active { color: var(--gold); }
+
+  /* ── UNIT TOGGLE ── */
+  .unit-toggle {
+    display: flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px; margin: 16px 18px 12px;
+  }
+  .unit-btn {
+    flex: 1; padding: 10px 0; border-radius: 9px;
+    font-size: 14px; font-weight: 700; transition: all 0.15s;
+    color: var(--text3);
+  }
+  .unit-btn.active {
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(200,169,110,0.3);
+  }
+
+  /* ── INPUT BOX ── */
+  .input-row {
+    display: flex; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 14px; overflow: hidden; margin: 0 18px 12px;
+  }
+  .input-row input {
+    flex: 1; padding: 16px 14px; background: transparent;
+    color: var(--text); font-size: 22px; font-weight: 500; border: none;
+  }
+  .input-row input::placeholder { color: var(--text3); }
+  .input-row .unit-tag {
+    padding: 0 16px; display: flex; align-items: center;
+    color: var(--gold); font-size: 15px; font-weight: 700;
+    border-left: 1px solid var(--border); flex-shrink: 0;
+  }
+  .input-label { font-size: 11px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; padding: 16px 18px 6px; }
+
+  /* ── DUAL INPUT (C2-1) ── */
+  .dual-inputs { padding: 0 18px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .dual-input-group label { display: block; font-size: 11px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+
+  /* ── CALC BUTTON ── */
+  .calc-btn {
+    display: block; width: calc(100% - 36px); margin: 0 18px;
+    padding: 16px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    color: #fff; font-size: 16px; font-weight: 700; letter-spacing: 3px;
+    box-shadow: 0 4px 20px rgba(200,169,110,0.22);
+    transition: opacity 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .calc-btn:active { opacity: 0.85; transform: scale(0.98); }
+
+  /* ── RESULTS ── */
+  .results-wrap { padding: 24px 18px 0; }
+  .results-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+  }
+  .results-header .title { font-size: 10px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; }
+  .results-header .badge {
+    font-size: 12px; color: var(--gold); background: var(--gold-dim);
+    padding: 4px 12px; border-radius: 20px;
+  }
+  .result-items { display: flex; flex-direction: column; gap: 8px; }
+  .result-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 15px;
+    animation: fadeUp 0.18s ease both;
+  }
+  .result-item .ing-name { font-size: 14px; color: var(--text2); }
+  .result-item .ing-val { font-size: 16px; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .result-item .ing-val.approx { color: var(--text3); font-size: 13px; font-weight: 400; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; padding-bottom: 4px; }
+  .chip {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 5px 11px;
+    font-size: 11.5px; color: var(--text3);
+  }
+  .chip span { color: var(--gold); font-weight: 700; }
+
+  /* ── EDIT VIEW ── */
+  .edit-section { padding: 0 16px; display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
+  .edit-row {
+    display: flex; align-items: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .edit-row .ename { flex: 1; padding: 12px 14px; font-size: 14px; color: var(--text2); }
+  .edit-row .eright { display: flex; align-items: center; border-left: 1px solid var(--border); }
+  .edit-row input {
+    width: 80px; padding: 12px 8px; background: transparent;
+    color: var(--gold); font-size: 15px; font-weight: 700; border: none; text-align: right;
+  }
+  .edit-row input::placeholder { color: #3a3a3a; }
+  .edit-row .eunit { padding-right: 13px; font-size: 12px; color: var(--text3); }
+  .base-info {
+    margin: 0 16px 4px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .base-info .blabel { font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .base-info .bval { font-size: 14px; color: var(--text2); }
+  .base-info .bval em { color: var(--gold); font-style: normal; }
+  .save-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    color: #fff; padding: 8px 16px; border-radius: 20px;
+    font-size: 13px; font-weight: 700; transition: all 0.2s;
+  }
+  .save-btn.saved { background: #2a4a2a; }
+  .hint-box {
+    margin: 0 16px; padding: 12px 14px;
+    background: rgba(200,169,110,0.05); border: 1px solid rgba(200,169,110,0.12);
+    border-radius: 10px; font-size: 12px; color: var(--text3); line-height: 1.8;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #2a4a2a; color: #7dca7d; border: 1px solid #3a6a3a;
+    padding: 10px 22px; border-radius: 30px; font-size: 13px; font-weight: 600;
+    opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 999; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── STAGGER animations for result items ── */
+  .result-item:nth-child(1) { animation-delay: 0.03s; }
+  .result-item:nth-child(2) { animation-delay: 0.06s; }
+  .result-item:nth-child(3) { animation-delay: 0.09s; }
+  .result-item:nth-child(4) { animation-delay: 0.12s; }
+  .result-item:nth-child(5) { animation-delay: 0.15s; }
+  .result-item:nth-child(6) { animation-delay: 0.18s; }
+  .result-item:nth-child(7) { animation-delay: 0.21s; }
+  .result-item:nth-child(8) { animation-delay: 0.24s; }
+  .result-item:nth-child(9) { animation-delay: 0.27s; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ HOME ════════════════ -->
+<div id="view-home" class="view active">
+  <div class="top-bar">
+    <div class="logo-badge">🍜</div>
+    <div>
+      <div class="top-bar h1" style="font-size:17px;font-weight:700;">配料计算器</div>
+      <div class="sub">生产配方系统</div>
+    </div>
+  </div>
+  <div class="sec-label" id="home-count">全部品类</div>
+  <div class="recipe-list" id="recipe-list"></div>
+</div>
+
+<!-- ════════════════ CALCULATOR ════════════════ -->
+<div id="view-calc" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showHome()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div>
+      <div id="calc-title" style="font-size:17px;font-weight:700;"></div>
+      <div id="calc-sub" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
+    </div>
+  </div>
+
+  <!-- Normal input -->
+  <div id="normal-input-area">
+    <div class="unit-toggle">
+      <button class="unit-btn active" id="btn-kg" onclick="setUnit('kg')">kg 公斤</button>
+      <button class="unit-btn" id="btn-g" onclick="setUnit('g')">g 克</button>
+    </div>
+    <div class="input-row">
+      <input type="number" id="main-input" placeholder="输入重量" inputmode="decimal" />
+      <div class="unit-tag" id="unit-display">kg</div>
+    </div>
+  </div>
+
+  <!-- C2-1 dual input -->
+  <div id="dual-input-area" style="display:none;">
+    <div class="dual-inputs">
+      <div class="dual-input-group">
+        <label>🥩 牛肉重量</label>
+        <div class="unit-toggle" style="margin:0 0 6px;">
+          <button class="unit-btn active" id="d-btn-kg1" onclick="setDualUnit(1,'kg')">kg 公斤</button>
+          <button class="unit-btn" id="d-btn-g1" onclick="setDualUnit(1,'g')">g 克</button>
+        </div>
+        <div class="input-row" style="margin:0;">
+          <input type="number" id="dual-input-1" placeholder="牛肉重量" inputmode="decimal" />
+          <div class="unit-tag" id="dual-unit-1">kg</div>
+        </div>
+      </div>
+      <div class="dual-input-group" style="margin-top:10px;">
+        <label>🧈 牛油重量（ไขมันเนื้อวัว）</label>
+        <div class="unit-toggle" style="margin:0 0 6px;">
+          <button class="unit-btn active" id="d-btn-kg2" onclick="setDualUnit(2,'kg')">kg 公斤</button>
+          <button class="unit-btn" id="d-btn-g2" onclick="setDualUnit(2,'g')">g 克</button>
+        </div>
+        <div class="input-row" style="margin:0;">
+          <input type="number" id="dual-input-2" placeholder="牛油重量" inputmode="decimal" />
+          <div class="unit-tag" id="dual-unit-2">kg</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">计　算</button>
+
+  <div id="results-area" style="display:none;">
+    <div class="results-wrap">
+      <div class="results-header">
+        <div class="title">配料清单</div>
+        <div class="badge" id="results-badge"></div>
+      </div>
+      <div class="result-items" id="result-items"></div>
+      <div class="chips" id="result-chips"></div>
+      <div id="bowls-per-bag" style="display:none;margin-top:14px;padding:12px 15px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;color:var(--text3);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ EDIT ════════════════ -->
+<div id="view-edit" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showHome()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div style="flex:1;">
+      <div style="font-size:17px;font-weight:700;">修改配方</div>
+      <div id="edit-sub" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
+    </div>
+    <button class="save-btn" id="save-btn" onclick="saveRecipe()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      保存
+    </button>
+  </div>
+  <div style="height:14px;"></div>
+  <div class="base-info" id="edit-base-info"></div>
+  <div class="sec-label">配料用量（基于基准量）</div>
+  <div class="edit-section" id="edit-section"></div>
+  <div class="hint-box">
+    💾 配方修改后点击「保存」，数据将<strong style="color:var(--gold)">永久储存</strong>在本设备，重新打开页面仍然有效。
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+// DEFAULT RECIPES  (per baseAmount of mainIngredient)
+// ════════════════════════════════════════
+const DEFAULT_RECIPES = [
+  {
+    id: "C1-1",
+    name: "C1-1 浇头肉酱",
+    mainIngredient: "猪肉",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    bowlsPerBag: 30,
+    ingredients: [
+      { name: "P8 药料子", amount: 8, unit: "g" },
+      { name: "M4 盐", amount: 4, unit: "g" },
+      { name: "M2 蘑菇精", amount: 7, unit: "g" },
+      { name: "M1 味精", amount: 4, unit: "g" },
+      { name: "P23 生姜", amount: 10, unit: "g" },
+      { name: "P24 洋葱", amount: 10, unit: "g" },
+      { name: "ซีอิ๊ว 酱油", amount: 1.5, unit: "g" },
+    ]
+  },
+  {
+    id: "C2-1",
+    name: "C2-1 红烧牛肉",
+    mainIngredient: "牛肉",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    bowlsPerBag: 12,
+    ingredients: [
+      { name: "ไขมันเนื้อวัว 牛油", amount: 28, unit: "g" },
+      { name: "P8 药料子", amount: 12, unit: "g" },
+      { name: "P4 细辣椒", amount: 16, unit: "g" },
+      { name: "M1 味精", amount: 9, unit: "g" },
+      { name: "M3 鸡精", amount: 10, unit: "g" },
+      { name: "P5 豆瓣酱", amount: 60, unit: "g" },
+      { name: "P23 生姜", amount: 20, unit: "g" },
+      { name: "P24 洋葱", amount: 20, unit: "g" },
+      { name: "ซีอิ๊ว 酱油", amount: 2, unit: "g" },
+      { name: "汤", amount: 630, unit: "g" },
+    ]
+  },
+  {
+    id: "C9-1",
+    name: "C9-1 特辣辣椒",
+    mainIngredient: "P3 粗辣椒",
+    baseAmount: 25, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "P11 豆油", amount: 40000, unit: "g" },
+      { name: "M6 白芝麻", amount: 3000, unit: "g" },
+      { name: "P8 药料子", amount: 500, unit: "g" },
+      { name: "M4 盐", amount: 500, unit: "g" },
+      { name: "M1 味精", amount: 500, unit: "g" },
+      { name: "E3 香菜", amount: 500, unit: "g" },
+      { name: "P23 生姜", amount: 500, unit: "g" },
+      { name: "P24 洋葱", amount: 1000, unit: "g" },
+    ]
+  },
+  {
+    id: "C9-2",
+    name: "C9-2 麻辣辣椒",
+    mainIngredient: "P3 粗辣椒",
+    baseAmount: 25, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "P12 葵花油", amount: 40000, unit: "g" },
+      { name: "P10 麻油", amount: 10000, unit: "g" },
+      { name: "M6 白芝麻", amount: 2000, unit: "g" },
+      { name: "P6 花椒", amount: 300, unit: "g" },
+      { name: "P8 药料子", amount: 500, unit: "g" },
+      { name: "M4 盐", amount: 500, unit: "g" },
+      { name: "M1 味精", amount: 500, unit: "g" },
+      { name: "E3 香菜", amount: 500, unit: "g" },
+      { name: "P24 洋葱", amount: 1000, unit: "g" },
+      { name: "P23 生姜", amount: 500, unit: "g" },
+    ]
+  },
+  {
+    id: "C11",
+    name: "C11 肥肠浇头",
+    mainIngredient: "猪肥肠",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    bowlsPerBag: 8,
+    ingredients: [
+      { name: "P11 大豆油", amount: 70, unit: "g" },
+      { name: "P5 豆瓣酱", amount: 80, unit: "g" },
+      { name: "M3 鸡精", amount: 15, unit: "g" },
+      { name: "M1 味精", amount: 12, unit: "g" },
+      { name: "P8 药料子", amount: 10, unit: "g" },
+      { name: "P23 生姜", amount: 10, unit: "g" },
+      { name: "P24 洋葱", amount: 10, unit: "g" },
+      { name: "汤", amount: 700, unit: "g" },
+    ]
+  },
+  {
+    id: "C13",
+    name: "C13 鸡肉",
+    mainIngredient: "鸡肉",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    bowlsPerBag: 8,
+    ingredients: [
+      { name: "M4 盐", amount: 15, unit: "g" },
+    ]
+  },
+  {
+    id: "C14",
+    name: "C14 肘子",
+    mainIngredient: "猪腿肉",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    bowlsPerBag: 1,
+    ingredients: [
+      { name: "M1 味精", amount: 5, unit: "g" },
+      { name: "M4 盐", amount: 3, unit: "g" },
+      { name: "M5 糖", amount: 3, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 10, unit: "g" },
+    ]
+  },
+  {
+    id: "F1-2",
+    name: "F1-2 鸡翅",
+    mainIngredient: "鸡翅",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 5, unit: "g" },
+      { name: "M4 盐", amount: 3, unit: "g" },
+      { name: "M5 糖", amount: 3, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 5, unit: "g" },
+    ]
+  },
+  {
+    id: "F2",
+    name: "F2 猪蹄",
+    mainIngredient: "猪脚",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 3, unit: "g" },
+      { name: "M4 盐", amount: 3, unit: "g" },
+      { name: "M5 糖", amount: 3, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 5, unit: "g" },
+    ]
+  },
+  {
+    id: "F5",
+    name: "F5 牛腱子肉",
+    mainIngredient: "牛腱子",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 5, unit: "g" },
+      { name: "M4 盐", amount: 3, unit: "g" },
+      { name: "M5 糖", amount: 3, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 10, unit: "g" },
+    ]
+  },
+  {
+    id: "F6",
+    name: "F6 鸡爪",
+    mainIngredient: "鸡爪",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 5, unit: "g" },
+      { name: "M4 盐", amount: 3, unit: "g" },
+      { name: "M5 糖", amount: 3, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 5, unit: "g" },
+    ]
+  },
+  {
+    id: "F8",
+    name: "F8 鸭舌",
+    mainIngredient: "鸭舌",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 20, unit: "g" },
+      { name: "M4 盐", amount: 4, unit: "g" },
+      { name: "M5 糖", amount: 10, unit: "g" },
+      { name: "P25 干辣椒", amount: 40, unit: "g" },
+      { name: "P26 花椒", amount: 10, unit: "g" },
+      { name: "P23 生姜", amount: 10, unit: "g" },
+      { name: "P24 洋葱", amount: 10, unit: "g" },
+    ]
+  },
+  {
+    id: "F10",
+    name: "F10 鸭胗",
+    mainIngredient: "鸭胗",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 20, unit: "g" },
+      { name: "M4 盐", amount: 4, unit: "g" },
+      { name: "M5 糖", amount: 10, unit: "g" },
+      { name: "P25 干辣椒", amount: 40, unit: "g" },
+      { name: "P26 花椒", amount: 10, unit: "g" },
+      { name: "P23 生姜", amount: 10, unit: "g" },
+      { name: "P24 洋葱", amount: 10, unit: "g" },
+    ]
+  },
+  {
+    id: "F11",
+    name: "F11 干豆腐",
+    mainIngredient: "豆腐",
+    baseAmount: 1, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "M1 味精", amount: 10, unit: "g" },
+      { name: "M2 蘑菇精", amount: 7.5, unit: "g" },
+      { name: "M5 糖", amount: 10, unit: "g" },
+      { name: "P28 เครื่องเทศ 香料", amount: 10, unit: "g" },
+    ]
+  },
+  {
+    id: "C9-1",
+    name: "C9-1 特辣辣椒",
+    mainIngredient: "P3 粗辣椒",
+    baseAmount: 25, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "P11 豆油", amount: 40000, unit: "g" },
+      { name: "M6 白芝麻", amount: 3000, unit: "g" },
+      { name: "P8 药料子", amount: 500, unit: "g" },
+      { name: "M4 盐", amount: 500, unit: "g" },
+      { name: "M1 味精", amount: 500, unit: "g" },
+      { name: "E3 香菜", amount: 500, unit: "g" },
+      { name: "P23 生姜", amount: 500, unit: "g" },
+      { name: "P24 洋葱", amount: 1000, unit: "g" },
+    ]
+  },
+  {
+    id: "C9-2",
+    name: "C9-2 麻辣辣椒",
+    mainIngredient: "P3 粗辣椒",
+    baseAmount: 25, baseUnit: "kg",
+    dualInput: false,
+    ingredients: [
+      { name: "P12 葵花油", amount: 30000, unit: "g" },
+      { name: "P10 麻油", amount: 10000, unit: "g" },
+      { name: "M6 白芝麻", amount: 2000, unit: "g" },
+      { name: "P6 花椒", amount: 300, unit: "g" },
+      { name: "P8 药料子", amount: 500, unit: "g" },
+      { name: "M4 盐", amount: 500, unit: "g" },
+      { name: "M1 味精", amount: 500, unit: "g" },
+      { name: "E3 香菜", amount: 500, unit: "g" },
+      { name: "P24 洋葱", amount: 1000, unit: "g" },
+      { name: "P23 生姜", amount: 500, unit: "g" },
+    ]
+  },
+];
+
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const STORAGE_KEY = "prod_calc_recipes_v3";
+
+function loadRecipes() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_RECIPES));
+}
+
+function saveRecipes(recipes) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+}
+
+let recipes = loadRecipes();
+let currentRecipeId = null;
+let currentUnit = "kg";
+let editRecipeData = null;
+
+// ════════════════════════════════════════
+// VIEWS
+// ════════════════════════════════════════
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showHome() {
+  renderHome();
+  showView('home');
+}
+
+function showCalc(id) {
+  currentRecipeId = id;
+  currentUnit = "kg";
+  const r = getRecipe(id);
+  document.getElementById('calc-title').textContent = r.name;
+  document.getElementById('calc-sub').textContent = `输入 ${r.mainIngredient} 重量`;
+  document.getElementById('results-area').style.display = 'none';
+  document.getElementById('main-input').value = '';
+  document.getElementById('normal-input-area').style.display = 'block';
+  document.getElementById('dual-input-area').style.display = 'none';
+  setUnit('kg');
+  showView('calc');
+}
+
+function showEdit(id) {
+  const r = getRecipe(id);
+  editRecipeData = JSON.parse(JSON.stringify(r));
+  document.getElementById('edit-sub').textContent = r.name;
+  document.getElementById('save-btn').textContent = '';
+  document.getElementById('save-btn').innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    保存
+  `;
+  document.getElementById('save-btn').className = 'save-btn';
+
+  document.getElementById('edit-base-info').innerHTML = `
+    <div class="blabel">基准用量</div>
+    <div class="bval">${r.baseAmount}${r.baseUnit} <em>${r.mainIngredient}</em>
+
+    </div>
+  `;
+
+  const sec = document.getElementById('edit-section');
+  sec.innerHTML = '';
+  r.ingredients.forEach((ing, i) => {
+    const row = document.createElement('div');
+    row.className = 'edit-row';
+    row.innerHTML = `
+      <div class="ename">${ing.name}</div>
+      <div class="eright">
+        <input type="number" inputmode="decimal" value="${ing.amount ?? ''}" placeholder="适量" data-idx="${i}" oninput="onEditInput(${i}, this.value)">
+        <div class="eunit">${ing.unit}</div>
+      </div>
+    `;
+    sec.appendChild(row);
+  });
+  showView('edit');
+}
+
+// ════════════════════════════════════════
+// RENDER HOME
+// ════════════════════════════════════════
+function renderHome() {
+  const list = document.getElementById('recipe-list');
+  list.innerHTML = '';
+  document.getElementById('home-count').textContent = `全部品类 (${recipes.length})`;
+  recipes.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    const countable = r.ingredients.filter(i => i.amount !== null).length;
+    row.innerHTML = `
+      <button class="recipe-card" onclick="showCalc('${r.id}')">
+        <div>
+          <div class="rname">${r.name}</div>
+          <div class="rmeta">基准：${r.baseAmount}${r.baseUnit} ${r.mainIngredient}　·　${countable} 种配料${r.bowlsPerBag ? `　·　${r.bowlsPerBag} 碗/kg` : ''}</div>
+        </div>
+        <div class="rarrow">›</div>
+      </button>
+      <button class="edit-btn" onclick="showEdit('${r.id}')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// ════════════════════════════════════════
+// UNIT CONTROLS
+// ════════════════════════════════════════
+function setUnit(u) {
+  currentUnit = u;
+  document.getElementById('btn-kg').className = 'unit-btn' + (u === 'kg' ? ' active' : '');
+  document.getElementById('btn-g').className  = 'unit-btn' + (u === 'g'  ? ' active' : '');
+  document.getElementById('unit-display').textContent = u;
+}
+
+
+
+// ════════════════════════════════════════
+// CALCULATE
+// ════════════════════════════════════════
+function toKg(val, unit) {
+  return unit === 'kg' ? +val : +val / 1000;
+}
+
+function fmtAmount(grams) {
+  if (grams >= 1000) {
+    const kg = grams / 1000;
+    const rounded = Math.round(kg * 1000) / 1000;
+    return { display: `${rounded} kg`, value: rounded, unit: 'kg' };
+  }
+  const rounded = Math.round(grams * 10) / 10;
+  return { display: `${rounded} g`, value: rounded, unit: 'g' };
+}
+
+function calculate() {
+  const r = getRecipe(currentRecipeId);
+  if (!r) return;
+  const v = document.getElementById('main-input').value;
+  if (!v || isNaN(v) || +v <= 0) {
+    showToast('⚠️ 请输入有效的重量');
+    return;
+  }
+  const mainKg = toKg(v, currentUnit);
+  const ratio = mainKg / r.baseAmount;
+  const badgeText = `${mainKg} kg ${r.mainIngredient}`;
+  const items = r.ingredients.map(ing => {
+    if (ing.amount === null) return { name: ing.name, val: null, note: '适量', isNote: true };
+    return { name: ing.name, val: fmtAmount(ing.amount * ratio) };
+  });
+  renderResults(badgeText, items, r);
+}
+
+function renderResults(badgeText, items, r) {
+  document.getElementById('results-badge').textContent = badgeText;
+
+  const container = document.getElementById('result-items');
+  container.innerHTML = '';
+  const chips = document.getElementById('result-chips');
+  chips.innerHTML = '';
+
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    div.style.animationDelay = (i * 0.04) + 's';
+    if (item.isNote) {
+      div.innerHTML = `<div class="ing-name">${item.name}</div><div class="ing-val approx">${item.note}</div>`;
+    } else {
+      div.innerHTML = `<div class="ing-name">${item.name}</div><div class="ing-val">${item.val.display}</div>`;
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${item.val.display}</span> ${item.name}`;
+      chips.appendChild(chip);
+    }
+    container.appendChild(div);
+  });
+
+  document.getElementById('results-area').style.display = 'block';
+  setTimeout(() => {
+    // Show bowls per bag info if available
+  const bpbEl = document.getElementById('bowls-per-bag');
+  if (r && r.bowlsPerBag) {
+    const mainKgVal = toKg(document.getElementById('main-input').value, currentUnit);
+    const ratio2 = mainKgVal / r.baseAmount;
+    const totalBowls = Math.round(r.bowlsPerBag * ratio2);
+    bpbEl.innerHTML = `<span style="color:var(--gold);font-weight:700;">${totalBowls} 碗</span> 参考出碗数（${r.bowlsPerBag} 碗/kg 基准）`;
+    bpbEl.style.display = 'block';
+  } else {
+    bpbEl.style.display = 'none';
+  }
+  document.getElementById('results-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
+// ════════════════════════════════════════
+// EDIT & SAVE
+// ════════════════════════════════════════
+function onEditInput(idx, val) {
+  editRecipeData.ingredients[idx].amount = val === '' ? null : +val;
+}
+
+function saveRecipe() {
+  recipes = recipes.map(r => r.id === editRecipeData.id ? editRecipeData : r);
+  saveRecipes(recipes);
+  const btn = document.getElementById('save-btn');
+  btn.className = 'save-btn saved';
+  btn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    已保存
+  `;
+  showToast('✅ 配方已保存');
+  setTimeout(() => showHome(), 900);
+}
+
+// ════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════
+function getRecipe(id) { return recipes.find(r => r.id === id); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+renderHome();
+</script>
+</body>
+</html>
